@@ -136,6 +136,8 @@ class OrchestratorConfig:
       storage_mode = storage_mode_env.strip().lower()
     elif os.environ.get("GITHUB_ACTIONS", "").lower() == "true":
       storage_mode = "github_actions"
+    elif not gcs_bucket:
+      storage_mode = "local"
     else:
       storage_mode = "gcs"
 
@@ -157,16 +159,14 @@ class OrchestratorConfig:
     )
     total_workers = int(total_workers_env) if total_workers_env is not None and str(total_workers_env).isdigit() else None
 
-    target_sha = os.environ.get("CODEMENDER_TARGET_SHA") or os.environ.get(
-        "GITHUB_SHA"
-    )
+    target_sha = os.environ.get("CODEMENDER_TARGET_SHA") or os.environ.get("GITHUB_SHA") or os.environ.get("GIT_COMMIT")
     base_workspace_url = os.environ.get("CODEMENDER_BASE_WORKSPACE_URL")
     partition_urls = os.environ.get("CODEMENDER_PARTITION_URLS")
     upload_urls = os.environ.get("CODEMENDER_UPLOAD_URLS")
     metadata_urls = os.environ.get("CODEMENDER_METADATA_URLS")
 
     # 5. Parse Repository Metadata and Credentials
-    repo_url = os.environ.get("GITHUB_REPO_URL")
+    repo_url = os.environ.get("GITHUB_REPO_URL") or os.environ.get("GIT_URL")
     github_token = (
         os.environ.get("GITHUB_APP_TOKEN")
         or os.environ.get("GITHUB_PAT")
@@ -192,17 +192,17 @@ class OrchestratorConfig:
           os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
           or bool(os.environ.get("CODEMENDER_PR_BASE_REF") or os.environ.get("GITHUB_BASE_REF"))
       )
-    pr_base_ref = os.environ.get("CODEMENDER_PR_BASE_REF") or os.environ.get("GITHUB_BASE_REF")
+    pr_base_ref = os.environ.get("CODEMENDER_PR_BASE_REF") or os.environ.get("GITHUB_BASE_REF") or os.environ.get("CHANGE_TARGET") or os.environ.get("CI_MERGE_REQUEST_TARGET_BRANCH_NAME")
     if pr_base_ref:
       pr_base_ref = pr_base_ref.strip()
-    pr_head_ref = os.environ.get("CODEMENDER_PR_HEAD_REF") or os.environ.get("GITHUB_HEAD_REF")
+    pr_head_ref = os.environ.get("CODEMENDER_PR_HEAD_REF") or os.environ.get("GITHUB_HEAD_REF") or os.environ.get("CHANGE_BRANCH") or os.environ.get("CI_MERGE_REQUEST_SOURCE_BRANCH_NAME")
     if pr_head_ref:
       pr_head_ref = pr_head_ref.strip()
     is_fork_pr = is_pr_scan and (
         os.environ.get("CODEMENDER_IS_FORK_PR", "").lower() == "true"
     )
 
-    pr_num_env = os.environ.get("CODEMENDER_PR_NUMBER") or os.environ.get("GITHUB_PR_NUMBER")
+    pr_num_env = os.environ.get("CODEMENDER_PR_NUMBER") or os.environ.get("GITHUB_PR_NUMBER") or os.environ.get("CHANGE_ID") or os.environ.get("CI_MERGE_REQUEST_IID")
     pr_number = None
     if pr_num_env:
       try:

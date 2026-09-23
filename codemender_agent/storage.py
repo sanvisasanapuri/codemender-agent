@@ -561,6 +561,8 @@ def get_storage_adapter(
     mode = mode.strip().lower()
   elif os.environ.get("GITHUB_ACTIONS", "").lower() == "true":
     mode = "github_actions"
+  elif not (bucket_name or os.environ.get("CODEMENDER_GCS_BUCKET")):
+    mode = "local"
   else:
     mode = "gcs"
 
