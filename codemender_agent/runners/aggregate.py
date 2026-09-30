@@ -653,7 +653,17 @@ def _render_step_summary(
       logger.warning("Failed to query base_db for step summary: %s", e)
 
   # 3. Construct header metadata section (repository, target commit, execution mode)
-  mode_desc = "Pull Request Scan (Clean as You Code)" if config.is_pr_scan else "Nightly Repository Scan"
+  mode_labels = {
+      "changed_lines": "Pull Request Scan (Clean as You Code)",
+      "changed_files": "Pull Request Scan (Clean as You Code - Whole Changed Files)",
+      "1hop_impact": "Pull Request Scan (Clean as You Code - 1-Hop Impact: Callers & Callees)",
+      "full_repo": "Full Repository Audit (⚠️ Small Repos Only)",
+  }
+  mode_desc = (
+      mode_labels.get(config.pr_scan_mode, "Pull Request Scan (Clean as You Code)")
+      if config.is_pr_scan
+      else "Nightly Repository Scan"
+  )
   commit_desc = target_sha[:8] if target_sha else "HEAD"
 
   lines = [

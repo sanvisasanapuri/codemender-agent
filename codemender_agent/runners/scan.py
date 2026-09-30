@@ -473,8 +473,13 @@ def _scan_repository(
     # 1. Execute 'cm find' across each configured target directory
     for target in targets:
       try:
+        diff_ref = (
+            cfg.diff_base_ref
+            if (cfg.is_pr_scan and cfg.pr_scan_mode == "1hop_impact")
+            else None
+        )
         find_cmd = build_cm_command(
-            cm_binary, "find", target, cli_version=cli_version
+            cm_binary, "find", target, cli_version=cli_version, diff_ref=diff_ref
         )
         res = run_command(
             find_cmd,
@@ -535,6 +540,7 @@ def _filter_findings(
     force_overwrite: bool,
     is_pr_scan: bool = False,
     pr_base_ref: Optional[str] = None,
+    pr_scan_mode: str = "changed_lines",
 ) -> tuple[list[dict[str, any]], list[str], list[str]]:
   """Filters findings against PR modified hunks (if PR scan) and remote duplicates."""
   active_findings = []
@@ -543,7 +549,7 @@ def _filter_findings(
   clean_repo_url = sanitize_git_url(repo_url)
 
   changed_lines = None
-  if is_pr_scan and pr_base_ref:
+  if is_pr_scan and pr_base_ref and pr_scan_mode not in ("full_repo", "1hop_impact"):
     changed_lines = get_pr_changed_lines(repo_dir, pr_base_ref)
     if changed_lines is None:
       logger.warning(
@@ -586,37 +592,27 @@ def _filter_findings(
     except ValueError:
       end_line = start_line
 
-    # 1. PR Scoped Filtering: Differential check against changed hunks
-    if is_pr_scan and pr_base_ref and changed_lines is not None:
-      file_changed_lines = changed_lines.get(file_path, set())
-      # Evaluate line ranges against PR modified hunks (start_line <= 0 falls back to {0})
-      finding_lines = (
-          set(range(start_line, max(start_line, end_line) + 1))
-          if start_line > 0
-          else {0}
-      )
-      intersection = file_changed_lines & finding_lines
-      if not intersection:
-        logger.info(
-            "PR Differential Scan: Finding %s in %s (lines %d-%d) is"
-            " pre-existing legacy debt (not modified in PR). Marking"
-            " PRE_EXISTING_IGNORED.",
-            finding_id,
-            file_path,
-            start_line,
-            end_line,
-        )
-        ignored_finding_ids.append(finding_id)
-        continue
-      else:
-        logger.info(
-            "PR Differential Scan: Finding %s in %s (lines %d-%d) matches PR modified lines %s. Retaining as active.",
-            finding_id,
-            file_path,
-            start_line,
-            end_line,
-            sorted(intersection),
-        )
+    # 1. PR Scoped Filtering:
+    if is_pr_scan and pr_base_ref:
+      if pr_scan_mode in ("full_repo", "1hop_impact"):
+        pass
+      elif pr_scan_mode == "changed_files" and changed_lines is not None:
+        if file_path not in changed_lines:
+          logger.info("PR Differential Scan (changed_files): Finding %s in %s ignored (file was not touched in PR).", finding_id, file_path)
+          ignored_finding_ids.append(finding_id)
+          continue
+        else:
+          logger.info("PR Differential Scan (changed_files): Finding %s in %s matches modified file. Retaining as active.", finding_id, file_path)
+      elif pr_scan_mode == "changed_lines" and changed_lines is not None:
+        file_changed_lines = changed_lines.get(file_path, set())
+        finding_lines = set(range(start_line, max(start_line, end_line) + 1)) if start_line > 0 else {0}
+        intersection = file_changed_lines & finding_lines
+        if not intersection:
+          logger.info("PR Differential Scan: Finding %s in %s (lines %d-%d) is pre-existing legacy debt (not modified in PR). Marking PRE_EXISTING_IGNORED.", finding_id, file_path, start_line, end_line)
+          ignored_finding_ids.append(finding_id)
+          continue
+        else:
+          logger.info("PR Differential Scan: Finding %s in %s (lines %d-%d) matches PR modified lines %s. Retaining as active.", finding_id, file_path, start_line, end_line, sorted(intersection))
 
     # 2. Universal Deduplication: Check if remote branch or PR already exists
     vuln_type = finding.get("VulnType") or "vulnerability"
@@ -954,6 +950,7 @@ def run_scan_pipeline() -> None:
       force_overwrite,
       is_pr_scan=config.is_pr_scan,
       pr_base_ref=config.pr_base_ref,
+      pr_scan_mode=config.pr_scan_mode,
   )
 
   # 9. Soft-delete skipped & ignored findings in local state.db for telemetry before archiving

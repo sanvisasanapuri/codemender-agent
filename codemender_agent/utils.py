@@ -144,6 +144,7 @@ def build_cm_command(
     target_or_id: Optional[str] = None,
     cli_version: Optional[str] = None,
     extra_flags: Optional[List[str]] = None,
+    diff_ref: Optional[str] = None,
 ) -> List[str]:
   """Centralized command builder for CodeMender CLI invocations."""
   # 1. Resolve active CLI version (preview vs legacy)
@@ -163,7 +164,8 @@ def build_cm_command(
 
     # Handle 'find' command
     if action == "find":
-      cmd = [cm_binary, "find", "-y"] + model_flags + [target_or_id]
+      diff_flags = ["--diff", diff_ref] if diff_ref else []
+      cmd = [cm_binary, "find", "-y"] + model_flags + diff_flags + (extra_flags or []) + [target_or_id]
     # Handle 'verify' command with optional exploit verification skip
     elif action == "verify":
       skip_flag = (
