@@ -46,6 +46,17 @@ PR_MODE_REVIEW_SUGGESTION = "review_suggestion"
 PR_MODE_CHILD_PR = "child_pr"
 VALID_PR_REMEDIATION_MODES = (PR_MODE_REVIEW_SUGGESTION, PR_MODE_CHILD_PR)
 
+PR_SCAN_MODE_CHANGED_LINES = "changed_lines"
+PR_SCAN_MODE_CHANGED_FILES = "changed_files"
+PR_SCAN_MODE_1HOP_IMPACT = "1hop_impact"
+PR_SCAN_MODE_FULL_REPO = "full_repo"
+VALID_PR_SCAN_MODES = (
+    PR_SCAN_MODE_CHANGED_LINES,
+    PR_SCAN_MODE_CHANGED_FILES,
+    PR_SCAN_MODE_1HOP_IMPACT,
+    PR_SCAN_MODE_FULL_REPO,
+)
+
 
 @dataclass(frozen=True)
 class OrchestratorConfig:
@@ -95,6 +106,8 @@ class OrchestratorConfig:
   pr_number: Optional[int] = None
   fail_on_findings: bool = False
   pr_remediation_mode: str = PR_MODE_REVIEW_SUGGESTION
+  pr_scan_mode: str = PR_SCAN_MODE_CHANGED_LINES
+  diff_base_ref: Optional[str] = None
 
   # Sandbox & Security Settings
   sandbox_enabled: bool = True
@@ -240,6 +253,28 @@ class OrchestratorConfig:
         else PR_MODE_REVIEW_SUGGESTION
     )
 
+    scan_mode_env = (os.environ.get("CODEMENDER_PR_SCAN_MODE") or "").strip().lower()
+    if scan_mode_env and scan_mode_env not in VALID_PR_SCAN_MODES:
+      logger.warning(
+          "Unrecognized CODEMENDER_PR_SCAN_MODE '%s' (expected one of %s). Falling back to '%s'.",
+          scan_mode_env, ", ".join(VALID_PR_SCAN_MODES), PR_SCAN_MODE_CHANGED_LINES,
+      )
+      pr_scan_mode = PR_SCAN_MODE_CHANGED_LINES
+    elif scan_mode_env:
+      pr_scan_mode = scan_mode_env
+    else:
+      pr_scan_mode = PR_SCAN_MODE_CHANGED_LINES
+
+    if pr_scan_mode == PR_SCAN_MODE_FULL_REPO and is_pr_scan:
+      logger.warning(
+          "⚠️ [PERFORMANCE WARNING] 'full_repo' scan mode active on PR scan. This evaluates all repository files and is only recommended for small repositories."
+      )
+
+    diff_base_ref = (
+        os.environ.get("CODEMENDER_DIFF_BASE_REF")
+        or (f"origin/{pr_base_ref}" if pr_base_ref else "origin/main")
+    )
+
     # 7. Parse Sandbox and Cleanup Port Configurations
     sandbox_env = os.environ.get("CODEMENDER_SANDBOX_ENABLED")
     if sandbox_env is not None and sandbox_env.strip():
@@ -315,6 +350,8 @@ class OrchestratorConfig:
         pr_number=pr_number,
         fail_on_findings=fail_on_findings,
         pr_remediation_mode=pr_remediation_mode,
+        pr_scan_mode=pr_scan_mode,
+        diff_base_ref=diff_base_ref,
         # Sandbox execution flags and network isolation profiles
         sandbox_enabled=sandbox_enabled,
         sandbox_network_profile=sandbox_network_profile,
