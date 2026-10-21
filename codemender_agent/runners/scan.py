@@ -19,6 +19,7 @@ import logging
 import os
 import shutil
 import sqlite3
+import subprocess
 import sys
 import tarfile
 import time
@@ -507,8 +508,20 @@ def _scan_repository(
             find_cmd,
             cwd=repo_dir,
             env=scrubbed_env,
-            check=True,
+            check=False,
         )
+        if isinstance(getattr(res, "returncode", None), int) and res.returncode != 0:
+          stdout_text = res.stdout or ""
+          if "match --fail-on=" in stdout_text or "CI Gate Failure" in stdout_text:
+            logger.info(
+                "cm find exited with code %d due to --fail-on findings;"
+                " proceeding to report extraction and remediation.",
+                res.returncode,
+            )
+          else:
+            raise subprocess.CalledProcessError(
+                res.returncode, find_cmd, stdout_text, ""
+            )
         # Capture and aggregate token usage telemetry
         token_usage = getattr(res, "token_usage", None)
         if isinstance(token_usage, dict):

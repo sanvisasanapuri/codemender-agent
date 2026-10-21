@@ -176,7 +176,7 @@ def build_cm_command(
 
     # Handle 'find' command
     if action == "find":
-      diff_flags = ["--diff", diff_ref] if diff_ref else []
+      diff_flags = [f"--diff={diff_ref}"] if diff_ref else []
       cmd = [cm_binary, "find", "-y"] + model_flags + diff_flags + (extra_flags or []) + [target_or_id]
     # Handle 'verify' command with optional exploit verification skip
     elif action == "verify":
