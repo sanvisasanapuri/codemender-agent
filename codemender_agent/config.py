@@ -64,6 +64,7 @@ class OrchestratorConfig:
 
   # CodeMender CLI Version & AI Models
   cli_version: str = "preview"
+  binary_version: str = "latest"
   model: Optional[str] = None
   find_model: Optional[str] = None
   verify_model: Optional[str] = None
@@ -121,10 +122,20 @@ class OrchestratorConfig:
     """Loads configuration from environment variables safely in one place."""
     # 1. Parse CLI Version and Model Hierarchies
     cli_version = os.environ.get("CODEMENDER_CLI_VERSION", "preview").lower()
-    model = os.environ.get("CODEMENDER_MODEL")
-    find_model = os.environ.get("CODEMENDER_FIND_MODEL") or model
-    verify_model = os.environ.get("CODEMENDER_VERIFY_MODEL") or model
-    fix_model = os.environ.get("CODEMENDER_FIX_MODEL") or model
+    binary_version = (
+        os.environ.get("CODEMENDER_BINARY_VERSION", "latest").strip() or "latest"
+    )
+
+    def _clean_model(val):
+      if not val:
+        return None
+      cleaned = val.strip()
+      return None if (not cleaned or cleaned.lower() in ("default", "auto", "none")) else cleaned
+
+    model = _clean_model(os.environ.get("CODEMENDER_MODEL"))
+    find_model = _clean_model(os.environ.get("CODEMENDER_FIND_MODEL")) or model
+    verify_model = _clean_model(os.environ.get("CODEMENDER_VERIFY_MODEL")) or model
+    fix_model = _clean_model(os.environ.get("CODEMENDER_FIX_MODEL")) or model
     skip_exploit = (
         os.environ.get("CODEMENDER_SKIP_EXPLOIT_VERIFICATION", "false").lower()
         == "true"
@@ -312,6 +323,7 @@ class OrchestratorConfig:
     return cls(
         # AI models and CLI versions
         cli_version=cli_version,
+        binary_version=binary_version,
         model=model,
         find_model=find_model,
         verify_model=verify_model,

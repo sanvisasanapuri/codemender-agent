@@ -83,12 +83,24 @@ def parse_token_metric(token_str: str) -> int:
   return int(float(token_str))
 
 
+def normalize_model_name(model_val: Optional[str]) -> Optional[str]:
+  """Normalizes model configuration strings, treating empty/'default'/'auto' as None."""
+  if not model_val:
+    return None
+  cleaned = model_val.strip()
+  if not cleaned or cleaned.lower() in ("default", "auto", "none"):
+    return None
+  return cleaned
+
+
 def resolve_command_model(command_name: str) -> Optional[str]:
   """Implements model precedence hierarchy: CODEMENDER_<COMMAND>_MODEL > CODEMENDER_MODEL > None."""
-  cmd_override = os.environ.get(f"CODEMENDER_{command_name.upper()}_MODEL")
+  cmd_override = normalize_model_name(
+      os.environ.get(f"CODEMENDER_{command_name.upper()}_MODEL")
+  )
   if cmd_override:
     return cmd_override
-  return os.environ.get("CODEMENDER_MODEL")
+  return normalize_model_name(os.environ.get("CODEMENDER_MODEL"))
 
 
 def accumulate_model_token_usage(

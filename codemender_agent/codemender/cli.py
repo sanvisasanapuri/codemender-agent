@@ -12,17 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
 import json
 import logging
+import os
 import re
 import shutil
 import subprocess
+import tempfile
+import zipfile
+import requests
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from codemender_agent.utils import (
     build_cm_command,
     extract_json_from_output,
+    normalize_model_name,
     run_command,
 )
 

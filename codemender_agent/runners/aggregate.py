@@ -26,6 +26,9 @@ import tarfile
 import time
 from typing import Optional, Set
 
+from codemender_agent.codemender.cli import ensure_cm_binary_version
+from codemender_agent.codemender.cli import get_installed_cm_semver
+from codemender_agent.codemender.cli import get_supported_models
 from codemender_agent.codemender.cli import log_cm_version
 from codemender_agent.config import OrchestratorConfig
 from codemender_agent.config import PR_MODE_REVIEW_SUGGESTION
@@ -665,6 +668,10 @@ def _render_step_summary(
       else "Nightly Repository Scan"
   )
   commit_desc = target_sha[:8] if target_sha else "HEAD"
+  active_cm_ver = get_installed_cm_semver() or getattr(config, "binary_version", "latest")
+  _, bin_default = get_supported_models()
+  resolved_default_model = os.environ.get("CODEMENDER_RESOLVED_DEFAULT_MODEL") or bin_default or "default"
+  active_model_desc = getattr(config, "model", None) or f"{resolved_default_model} (default)"
 
   lines = [
       "# 🛡️ CodeMender Security Remediation Summary",
@@ -672,6 +679,8 @@ def _render_step_summary(
       f"- **Repository:** `{owner}/{repo_name}`",
       f"- **Target Commit:** `{commit_desc}`",
       f"- **Execution Mode:** `{mode_desc}`",
+      f"- **CodeMender CLI Version:** `{active_cm_ver}`",
+      f"- **LLM Model:** `{active_model_desc}`",
   ]
 
   if config.is_pr_scan:
