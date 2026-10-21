@@ -27,6 +27,8 @@ import uuid
 
 # CodeMender CLI JSON parser and version logging
 from codemender_agent.codemender.cli import ensure_cm_binary_version
+from codemender_agent.codemender.cli import get_installed_cm_semver
+from codemender_agent.codemender.cli import get_supported_models
 from codemender_agent.codemender.cli import log_cm_version
 from codemender_agent.codemender.cli import validate_model_support
 from codemender_agent.codemender.cli import parse_findings_json
@@ -157,12 +159,27 @@ def _render_zero_findings_summary(
   cfg = config or OrchestratorConfig.from_env()
   summary_file = cfg.github_step_summary or os.environ.get("GITHUB_STEP_SUMMARY")
 
+  scope_labels = {
+      "1hop_impact": "1hop_impact (Modified Files + 1-Hop Callers/Callees — cm find --diff)",
+      "changed_lines": "changed_lines (Modified Diff Hunks Only — cm find --deep + diff filter)",
+      "changed_files": "changed_files (Whole Modified Files — cm find --deep + file filter)",
+      "full_repo": "full_repo (Full Repository Deep Audit — cm find --deep)",
+  }
   mode_desc = (
       "Pull Request Scan (Clean as You Code)"
       if is_pr_scan
       else "Nightly Repository Scan"
   )
+  scope_desc = (
+      scope_labels.get(cfg.pr_scan_mode, cfg.pr_scan_mode)
+      if is_pr_scan
+      else "full_repo (Full Repository Deep Audit — cm find --deep)"
+  )
   commit_desc = target_sha[:8] if target_sha else "HEAD"
+  active_cm_ver = get_installed_cm_semver() or getattr(cfg, "binary_version", "latest")
+  _, bin_default = get_supported_models()
+  resolved_default_model = os.environ.get("CODEMENDER_RESOLVED_DEFAULT_MODEL") or bin_default or "default"
+  active_model_desc = getattr(cfg, "model", None) or f"{resolved_default_model} (default)"
   reason_note = (
       f"\n- **Note:** {filtered_reasons}"
       if filtered_reasons and not is_pr_scan
@@ -185,7 +202,10 @@ def _render_zero_findings_summary(
 
 - **Repository:** `{owner}/{repo_name}`
 - **Target Commit:** `{commit_desc}`
-- **Execution Mode:** `{mode_desc}`{reason_note}{gate_section}
+- **Execution Mode:** `{mode_desc}`
+- **PR Scan Scope Mode:** `{scope_desc}`
+- **CodeMender CLI Version:** `{active_cm_ver}`
+- **LLM Model:** `{active_model_desc}`{reason_note}{gate_section}
 
 ### 📊 Remediation Overview
 

@@ -662,10 +662,21 @@ def _render_step_summary(
       "1hop_impact": "Pull Request Scan (Clean as You Code - 1-Hop Impact: Callers & Callees)",
       "full_repo": "Full Repository Audit (⚠️ Small Repos Only)",
   }
+  scope_labels = {
+      "1hop_impact": "1hop_impact (Modified Files + 1-Hop Callers/Callees — cm find --diff)",
+      "changed_lines": "changed_lines (Modified Diff Hunks Only — cm find --deep + diff filter)",
+      "changed_files": "changed_files (Whole Modified Files — cm find --deep + file filter)",
+      "full_repo": "full_repo (Full Repository Deep Audit — cm find --deep)",
+  }
   mode_desc = (
       mode_labels.get(config.pr_scan_mode, "Pull Request Scan (Clean as You Code)")
       if config.is_pr_scan
       else "Nightly Repository Scan"
+  )
+  scope_desc = (
+      scope_labels.get(config.pr_scan_mode, config.pr_scan_mode)
+      if config.is_pr_scan
+      else "full_repo (Full Repository Deep Audit — cm find --deep)"
   )
   commit_desc = target_sha[:8] if target_sha else "HEAD"
   active_cm_ver = get_installed_cm_semver() or getattr(config, "binary_version", "latest")
@@ -679,6 +690,7 @@ def _render_step_summary(
       f"- **Repository:** `{owner}/{repo_name}`",
       f"- **Target Commit:** `{commit_desc}`",
       f"- **Execution Mode:** `{mode_desc}`",
+      f"- **PR Scan Scope Mode:** `{scope_desc}`",
       f"- **CodeMender CLI Version:** `{active_cm_ver}`",
       f"- **LLM Model:** `{active_model_desc}`",
   ]
